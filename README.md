@@ -3,6 +3,8 @@ hssh
 
 Pure-Haskell SSH2 (RFC 4250-4254) client implementation.
 
+**It is just few steps from initial commit, nothing really working**
+
 Running
 -------
 
