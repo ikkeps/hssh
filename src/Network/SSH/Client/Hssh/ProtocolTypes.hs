@@ -1,4 +1,4 @@
-module Network.SSH.Client.Hssh.Serialize where
+module Network.SSH.Client.Hssh.ProtocolTypes where
 
 import Data.ByteString.Lazy ( ByteString, snoc, empty, fromStrict )
 import qualified Data.ByteString.Lazy as BL

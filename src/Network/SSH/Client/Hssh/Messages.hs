@@ -11,7 +11,7 @@ import Data.Serialize.Put ( Put, putWord32be, putWord8
                           , putLazyByteString )
 import Control.Monad (replicateM, forM)
 
-import Network.SSH.Client.Hssh.Serialize
+import Network.SSH.Client.Hssh.ProtocolTypes
 
 
 data SshMessage =
@@ -22,6 +22,21 @@ data SshMessage =
   | KexInit { kexInitLists            :: [[ByteString]]
             , kexInitKexPacketFollows :: Bool }
   deriving (Show)
+
+serialize (Ignore msg) = putString msg
+serialize (KexInit lists kexPacketFollows) = do
+    putLazyByteString $ BL.pack [1..16]
+    forM lists putList
+    putWord32be 0 -- ?
+
+parse :: Get SshMessage
+parse = do
+    code <- getWord8
+    case code of
+       1 -> parseDisconnect
+       2 -> parseIgnore
+       20 -> parseKexInit
+
 
 parseDisconnect = do
     reason <- getWord32be
@@ -38,9 +53,3 @@ parseKexInit = do
     kexPacketFollows <- getBool
     -- getWord32be
     return $ KexInit lists kexPacketFollows
-
-serialize (Ignore msg) = putString msg
-serialize (KexInit lists kexPacketFollows) = do
-    putLazyByteString $ BL.pack [1..16]
-    forM lists putList
-    putWord32be 0 -- ?
