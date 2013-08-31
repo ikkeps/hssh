@@ -65,8 +65,10 @@ serializePacket :: Packet -> Put
 serializePacket (Handshake software) = do
     putByteString (S.concat [sshTwoZeroDash, software, crlf])
 serializePacket Packet { .. } = do
-    let paddingSize = 37 -- TODO: generate random padding
-    putWord32be $ fromIntegral $ (S.length packetPayload) + paddingSize
+    let paddingSize = 45 -- TODO: 8 or cipher size align
+    let len = (S.length packetPayload) + paddingSize + 1
+    putWord32be $ fromIntegral len
     putWord8 $ fromIntegral paddingSize
     putByteString packetPayload
     putByteString $ S.pack [1..(fromIntegral paddingSize)]
+    -- TODO: MAC
