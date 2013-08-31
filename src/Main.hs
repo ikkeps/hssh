@@ -1,5 +1,7 @@
 import Data.Conduit
 import Data.Conduit.Binary (sourceHandle, sinkHandle)
+import Data.Conduit.Network ( Application, clientSettings, runTCPClient
+                            , appSource, appSink )
 import System.IO ( stdin, stdout, stderr
                  , hSetBuffering, BufferMode(NoBuffering))
 
@@ -10,4 +12,7 @@ main = do
     hSetBuffering stdout NoBuffering
     hSetBuffering stdin NoBuffering
     hSetBuffering stderr NoBuffering
-    runResourceT $ sourceHandle stdin $= pipeline $$ sinkHandle stdout
+    runTCPClient (clientSettings 22 "localhost") app
+
+app :: Application IO
+app d = (appSource d) $= pipeline $$ (appSink d)

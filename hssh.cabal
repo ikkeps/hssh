@@ -14,10 +14,12 @@ Executable test
   hs-source-dirs:   src
   ghc-options:      -Wall -fno-warn-orphans
   Default-language: Haskell2010
+  Extensions:       OverloadedStrings
+                  , RecordWildCards
   build-depends:    base                      == 4.6.*
                   , bytestring                == 0.10.*
-                  , conduit                   == 0.5.*
-                  , cereal                    == 0.3.5.*
-                  , cereal-conduit            == 0.6.*
-                  , network-conduit           == 0.6.2.*
+                  , conduit                   == 1.0.*
+                  , cereal                    == 0.3.*
+                  , cereal-conduit            == 0.7.*
+                  , network-conduit           == 1.0.*
                   , transformers              == 0.3.*

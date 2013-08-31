@@ -1,14 +1,9 @@
 module Network.SSH.Client.Hssh.ProtocolTypes where
 
-import Data.ByteString.Lazy ( ByteString, snoc, empty, fromStrict )
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as S
 import Data.Char (ord)
-import Data.Serialize.Get ( Get, getWord32be, getWord8
-                          , getByteString, skip, runGet, runGetLazy
-                          , getLazyByteString )
-import Data.Serialize.Put ( Put, putWord32be, putWord8
-                          , putByteString
-                          , putLazyByteString )
+import Data.Serialize.Get ( Get, getWord32be, getWord8, getByteString )
+import Data.Serialize.Put ( Put, putWord32be, putWord8, putByteString )
 import Control.Applicative ((<$>))
 
 getBool :: Get Bool
@@ -18,19 +13,19 @@ putBool :: Bool -> Put
 putBool True  = putWord8 1
 putBool False = putWord8 0
 
-getString :: Get ByteString
-getString = getWord32be >>= getLazyByteString . fromIntegral
+getString :: Get S.ByteString
+getString = getWord32be >>= getByteString . fromIntegral
 
-putString :: ByteString -> Put
+putString :: S.ByteString -> Put
 putString str = do
-    putWord32be $ fromIntegral $ BL.length str
-    putLazyByteString str
+    putWord32be $ fromIntegral $ S.length str
+    putByteString str
 
-parseList :: Get [ByteString]
+parseList :: Get [S.ByteString]
 parseList = do
     string <- getString
-    return $ BL.split (fromIntegral $ ord ',') string
+    return $ S.split (fromIntegral $ ord ',') string
 
-putList :: [ByteString] -> Put
+putList :: [S.ByteString] -> Put
 putList strings =
-      putString $ BL.intercalate (BL.pack [fromIntegral $ ord ',']) strings
+      putString $ S.intercalate (S.pack [fromIntegral $ ord ',']) strings
