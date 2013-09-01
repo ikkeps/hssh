@@ -1,5 +1,5 @@
 module Network.SSH.Client.Hssh.Packet where
-
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as S
 import Data.Serialize.Get (Get, getWord32be, getWord8, getByteString, skip)
 import Data.Serialize.Put (Put, putByteString, putWord32be, putWord8)
@@ -57,7 +57,6 @@ parsePacket withMac = do
         True -> Just <$> getByteString 8
         False -> return Nothing
 
-
 crlf :: S.ByteString
 crlf = S.pack [13, 10]
 
@@ -65,7 +64,8 @@ serializePacket :: Packet -> Put
 serializePacket (Handshake software) = do
     putByteString (S.concat [sshTwoZeroDash, software, crlf])
 serializePacket Packet { .. } = do
-    let paddingSize = 45 -- TODO: 8 or cipher size align
+    -- TODO: use cipher size to align in addition to default 8
+    let paddingSize = 8 - (S.length packetPayload + 5) `rem` 8 + 8 -- at least 4 bytes align
     let len = (S.length packetPayload) + paddingSize + 1
     putWord32be $ fromIntegral len
     putWord8 $ fromIntegral paddingSize

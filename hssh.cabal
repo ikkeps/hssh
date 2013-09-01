@@ -16,10 +16,16 @@ Executable test
   Default-language: Haskell2010
   Extensions:       OverloadedStrings
                   , RecordWildCards
+                  , GeneralizedNewtypeDeriving
+                  , MultiParamTypeClasses
+                  , TypeFamilies
   build-depends:    base                      == 4.6.*
+                  , mtl                       == 2.1.*  
                   , bytestring                == 0.10.*
                   , conduit                   == 1.0.*
                   , cereal                    == 0.3.*
                   , cereal-conduit            == 0.7.*
                   , network-conduit           == 1.0.*
                   , transformers              == 0.3.*
+                  , transformers-base         == 0.4.*
+                  , monad-control             == 0.3.*
