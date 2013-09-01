@@ -1,11 +1,10 @@
 module Network.SSH.Client.Hssh.Messages where
 
-import Data.Word (Word32)
-import qualified Data.ByteString as S
+import Data.ByteString as S
 import Data.Serialize.Get ( Get, getWord32be, getWord8, getByteString )
 import Data.Serialize.Put ( Put, putWord32be, putWord8, putByteString )
-import Control.Monad (replicateM, forM_)
 
+import Network.SSH.Client.Hssh.Prelude
 import Network.SSH.Client.Hssh.ProtocolTypes
 
 

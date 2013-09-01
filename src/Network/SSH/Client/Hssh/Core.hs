@@ -3,18 +3,19 @@ module Network.SSH.Client.Hssh.Core where
 import qualified Data.ByteString as S
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Reader (ask, asks)
-import Control.Applicative ((<*>))
-import Data.Functor ((<$>))
+import Control.Monad.State (get, gets, modify)
 import System.IO (stderr, hPutStrLn)
 import Data.Conduit
-import Data.Conduit.Cereal (conduitGet, sinkGet, conduitPut)
+import qualified Data.Conduit.List as CL
+import Data.Conduit.Cereal (conduitGet, sinkGet, sourcePut)
 import Data.Serialize.Put (runPut)
 import Data.Serialize.Get (runGet)
 
 import Data.Conduit.Network ( Application, clientSettings, runTCPClient
                             , appSource, appSink )
 
-import Network.SSH.Client.Hssh.Monad (Ssh, SshSettings(..), runSsh)
+import Network.SSH.Client.Hssh.Prelude
+import Network.SSH.Client.Hssh.Monad (Ssh, SshSettings(..), SshState(..), runSsh)
 import Network.SSH.Client.Hssh.Messages
 import Network.SSH.Client.Hssh.Packet
 
@@ -22,11 +23,7 @@ debug :: (MonadIO m) => String -> m ()
 debug = liftIO . (hPutStrLn stderr)
 
 logic :: Conduit Packet Ssh Packet
-logic = do
-    handshake
-    Just (hs @(Handshake sw)) <- await
-    debug $ show hs
-    go
+logic = go
   where
     go = do
         mbInput <- await
@@ -36,20 +33,17 @@ logic = do
                 debug $ show p
                 _msg <- parseSshMsg packetPayload
                 sendSshMsg $ KexInit [["diffie-hellman-group1-sha1"], ["ssh-dss", "ssh-rsa"], ["aes256-cbc"], ["aes256-cbc"], ["hmac-sha1"], ["hmac-sha1"], ["none"], ["none"], [], []] False
---                yield p
                 go
           Nothing -> return ()
     sendSshMsg msg = do
         debug $ "  MSG OUT: " ++ show msg
-        let p = Packet { packetPayload = runPut $ serialize msg
-                       , packetMac = Nothing }
+        let p = Packet { packetPayload = runPut $ serialize msg }
         debug $ " OUT: " ++ show p
         yield p
     parseSshMsg raw = do
         let msg = runGet parse raw
         debug $ "  MSG IN: " ++ show msg
         return msg
-    handshake = asks sshsSoftware >>= yield . Handshake
 
 runClient :: SshSettings -> IO ()
 runClient s@SshSettings{..} = runSsh s $ do
@@ -61,7 +55,30 @@ pipeline :: Conduit S.ByteString Ssh S.ByteString
 pipeline = parser =$= logic =$= serializer
   where
     parser = do
-      sinkGet handshake >>= yield
-      conduitGet $ parsePacket False
+      sw <- sinkGet parseHandshake
+      debug $ show sw
+      forever $ do
+
+        seq <- gets sshstInputSeqNumber
+        debug $ "IN #" ++ (show seq)
+        s <- ask
+        st <- get
+        sinkGet (parsePacket s st) >>= yield
+        bumpInSeqNumber
     serializer = do
-      conduitPut serializePacket
+        ask >>= yield . runPut . serializeHandshake
+        CL.mapM $ \p -> do
+            s <- ask
+            st <- get
+            seq <- gets sshstOutputSeqNumber
+            debug $ "OUT #" ++ (show seq)
+            let bin = runPut $ serializePacket st p
+            bumpOutSeqNumber
+            return bin
+    -- Lens, anyone?
+    bumpInSeqNumber =
+      modify (\s@SshState{sshstInputSeqNumber} ->
+               s{sshstInputSeqNumber=sshstInputSeqNumber+1})
+    bumpOutSeqNumber =
+      modify (\s@SshState{sshstOutputSeqNumber} ->
+               s{sshstOutputSeqNumber=sshstOutputSeqNumber+1})

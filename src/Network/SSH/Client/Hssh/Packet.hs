@@ -1,14 +1,14 @@
 module Network.SSH.Client.Hssh.Packet where
-import System.IO.Unsafe (unsafePerformIO)
-import qualified Data.ByteString as S
-import Data.Serialize.Get (Get, getWord32be, getWord8, getByteString, skip)
-import Data.Serialize.Put (Put, putByteString, putWord32be, putWord8)
-import Control.Applicative ((<$>))
+import Data.Serialize.Get (Get, getWord32be, getWord8, getByteString, skip, label)
+import Data.Serialize.Put (Put, runPut, putByteString, putWord32be, putWord8)
 
+import Data.ByteString as S
+import Network.SSH.Client.Hssh.Prelude
+import Network.SSH.Client.Hssh.Monad (SshSettings(..), SshState(..))
+import Network.SSH.Client.Hssh.Mac (Mac(..))
 
-data Packet = Handshake { handshakeSoftware :: S.ByteString }
-            | Packet { packetPayload :: S.ByteString -- already decoded and unpacked data
-                     , packetMac     :: Maybe S.ByteString }
+data Packet = Packet { packetPayload :: S.ByteString -- already decoded and unpacked data
+                     }
                 deriving (Show)
 
 
@@ -22,17 +22,17 @@ crlfLine = go S.empty
               return string
             _  -> go (S.snoc string ch)
 
-handshake :: Get Packet
-handshake = do
+parseHandshake :: Get S.ByteString
+parseHandshake = do
     line <- crlfLine
     case sshDash `S.isPrefixOf` line of
       True -> parseVersionAndSoftware line
-      False  -> handshake
+      False  -> fail "Bad handshake"
   where
     parseVersionAndSoftware line = do
       let (version, rest) = (S.splitAt 8 line)
       case version == sshTwoZeroDash of
-        True -> return $! Handshake {handshakeSoftware = rest}
+        True -> return rest
         False -> fail "Unsupported SSH version"
 
 sshDash :: S.ByteString
@@ -41,34 +41,38 @@ sshDash = "SSH-"
 sshTwoZeroDash :: S.ByteString
 sshTwoZeroDash = S.concat [sshDash, "2.0-"]
 
-parsePacket :: Bool -> Get Packet
-parsePacket withMac = do
-    packetLength <- getWord32be
-    paddingLength <- getWord8
+parsePacket :: SshSettings -> SshState -> Get Packet
+parsePacket _ SshState{sshstMac} = do
+    packetLength <- label "packet length" $ getWord32be
+    paddingLength <- label "padding length" $ getWord8
     let payloadLength = (fromIntegral packetLength) - (fromIntegral paddingLength) - 1
 
-    payload <- getByteString payloadLength
-    skip $ fromIntegral $ paddingLength
-    mac <- readMac
-    return $ Packet { packetPayload = payload
-                    , packetMac = mac }
+    payload <- label "payload" $ getByteString payloadLength
+    padding <- label "padding" $ getByteString $ fromIntegral $ paddingLength
+    mac <- label "mac" $ getByteString $ macLength sshstMac
+    -- Better way to concat Word32 and ByteString?
+    let myMac = calcMac sshstMac $ S.concat [runPut $ putWord32be packetLength, payload, padding]
+    when (myMac /= mac) $ fail "Bad MAC"
+    return $ Packet { packetPayload = payload }
   where
-    readMac = case withMac of
-        True -> Just <$> getByteString 8
-        False -> return Nothing
+
 
 crlf :: S.ByteString
 crlf = S.pack [13, 10]
 
-serializePacket :: Packet -> Put
-serializePacket (Handshake software) = do
-    putByteString (S.concat [sshTwoZeroDash, software, crlf])
-serializePacket Packet { .. } = do
+serializeHandshake :: SshSettings -> Put
+serializeHandshake SshSettings{sshsSoftware} = do
+    putByteString (S.concat [sshTwoZeroDash, sshsSoftware, crlf])
+
+serializePacket :: SshState -> Packet -> Put
+serializePacket SshState{sshstMac} Packet { .. } = do
     -- TODO: use cipher size to align in addition to default 8
     let paddingSize = 8 - (S.length packetPayload + 5) `rem` 8 + 8 -- at least 4 bytes align
-    let len = (S.length packetPayload) + paddingSize + 1
-    putWord32be $ fromIntegral len
+    let length = fromIntegral $ (S.length packetPayload) + paddingSize + 1
+    putWord32be length
     putWord8 $ fromIntegral paddingSize
     putByteString packetPayload
-    putByteString $ S.pack [1..(fromIntegral paddingSize)]
+    let padding = S.pack [1..(fromIntegral paddingSize)]
+    putByteString padding
+    putByteString $ sshstMac `calcMac` S.concat [runPut $ putWord32be length, packetPayload, padding]
     -- TODO: MAC
