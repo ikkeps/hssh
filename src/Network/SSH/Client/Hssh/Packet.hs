@@ -4,7 +4,7 @@ import Data.Serialize.Put (Put, runPut, putByteString, putWord32be, putWord8)
 
 import Data.ByteString as S
 import Network.SSH.Client.Hssh.Prelude
-import Network.SSH.Client.Hssh.Monad (SshSettings(..), SshState(..))
+import Network.SSH.Client.Hssh.Monad (Ssh, SshSettings(..), SshState(..))
 import Network.SSH.Client.Hssh.Mac (Mac(..))
 
 data Packet = Packet { packetPayload :: S.ByteString -- already decoded and unpacked data
@@ -41,21 +41,23 @@ sshDash = "SSH-"
 sshTwoZeroDash :: S.ByteString
 sshTwoZeroDash = S.concat [sshDash, "2.0-"]
 
-parsePacket :: SshSettings -> SshState -> Get Packet
-parsePacket _ SshState{sshstMac} = do
-    packetLength <- label "packet length" $ getWord32be
-    paddingLength <- label "padding length" $ getWord8
-    let payloadLength = (fromIntegral packetLength) - (fromIntegral paddingLength) - 1
-
-    payload <- label "payload" $ getByteString payloadLength
-    padding <- label "padding" $ getByteString $ fromIntegral $ paddingLength
-    mac <- label "mac" $ getByteString $ macLength sshstMac
-    -- Better way to concat Word32 and ByteString?
-    let myMac = calcMac sshstMac $ S.concat [runPut $ putWord32be packetLength, payload, padding]
-    when (myMac /= mac) $ fail "Bad MAC"
-    return $ Packet { packetPayload = payload }
+packetParser :: Ssh (Get Packet)
+packetParser = do
+    mac <- gets sshstMac
+    return $ parser mac
   where
+    parser mac = do
+      packetLength <- label "packet length" $ getWord32be
+      paddingLength <- label "padding length" $ getWord8
+      let payloadLength = (fromIntegral packetLength) - (fromIntegral paddingLength) - 1
 
+      payload <- label "payload" $ getByteString payloadLength
+      padding <- label "padding" $ getByteString $ fromIntegral $ paddingLength
+      signature <- label "mac" $ getByteString $ macLength mac
+      -- Better way to concat Word32 and ByteString?
+      let mySignature = calcMac mac $ S.concat [runPut $ putWord32be packetLength, payload, padding]
+      when (mySignature /= signature) $ fail "Bad MAC"
+      return $ Packet { packetPayload = payload }
 
 crlf :: S.ByteString
 crlf = S.pack [13, 10]
@@ -64,15 +66,16 @@ serializeHandshake :: SshSettings -> Put
 serializeHandshake SshSettings{sshsSoftware} = do
     putByteString (S.concat [sshTwoZeroDash, sshsSoftware, crlf])
 
-serializePacket :: SshState -> Packet -> Put
-serializePacket SshState{sshstMac} Packet { .. } = do
-    -- TODO: use cipher size to align in addition to default 8
-    let paddingSize = 8 - (S.length packetPayload + 5) `rem` 8 + 8 -- at least 4 bytes align
-    let length = fromIntegral $ (S.length packetPayload) + paddingSize + 1
-    putWord32be length
-    putWord8 $ fromIntegral paddingSize
-    putByteString packetPayload
-    let padding = S.pack [1..(fromIntegral paddingSize)]
-    putByteString padding
-    putByteString $ sshstMac `calcMac` S.concat [runPut $ putWord32be length, packetPayload, padding]
-    -- TODO: MAC
+packetSerializer :: Packet -> Ssh Put
+packetSerializer Packet { .. } = do
+    mac <- gets sshstMac
+    return $ do
+      -- TODO: use cipher size to align in addition to default 8
+      let paddingSize = 8 - (S.length packetPayload + 5) `rem` 8 + 8 -- at least 4 bytes align
+      let length = fromIntegral $ (S.length packetPayload) + paddingSize + 1
+      putWord32be length
+      putWord8 $ fromIntegral paddingSize
+      putByteString packetPayload
+      let padding = S.pack [1..(fromIntegral paddingSize)]
+      putByteString padding
+      putByteString $ mac `calcMac` S.concat [runPut $ putWord32be length, packetPayload, padding]

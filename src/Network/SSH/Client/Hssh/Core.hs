@@ -47,21 +47,18 @@ pipeline = parser =$= packetPipeline =$= serializer
       sw <- sinkGet parseHandshake
       debug $ show sw
       forever $ do
-
-        seq <- gets sshstInputSeqNumber
-        debug $ "IN #" ++ (show seq)
-        s <- ask
-        st <- get
-        sinkGet (parsePacket s st) >>= yield
+        seqNum <- gets sshstInputSeqNumber
+        debug $ "IN #" ++ (show seqNum)
+        -- FIXME: using sinkGet here is bad, need to find better way
+        lift packetParser >>= sinkGet >>= yield
         bumpInSeqNumber
     serializer = do
         ask >>= yield . runPut . serializeHandshake
-        CL.mapM $ \p -> do
-            s <- ask
-            st <- get
-            seq <- gets sshstOutputSeqNumber
-            debug $ "OUT #" ++ (show seq)
-            let bin = runPut $ serializePacket st p
+        CL.mapM $ \packet -> do
+            seqNum <- gets sshstOutputSeqNumber
+            debug $ "OUT #" ++ (show seqNum)
+            -- FIXME: Using bare runPut seems unefficient to me
+            bin <- runPut <$> packetSerializer packet
             bumpOutSeqNumber
             return bin
     -- Lens, anyone?
