@@ -27,6 +27,8 @@ Executable test
                   , cereal                    == 0.3.*
                   , cereal-conduit            == 0.7.*
                   , network-conduit           == 1.0.*
+                  , crypto-api                == 0.12.*
+                  , cryptohash-cryptoapi      == 0.1.*
                   , transformers              == 0.3.*
                   , transformers-base         == 0.4.*
                   , monad-control             == 0.3.*

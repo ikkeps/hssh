@@ -15,15 +15,20 @@ data SshMessage =
   | Ignore S.ByteString
   | KexInit { kexInitLists            :: [[S.ByteString]]
             , kexInitKexPacketFollows :: Bool }
+  | KexDhInit { kexDhInitE :: Integer }
   deriving (Show)
 
 serialize :: SshMessage -> Put
 serialize (Ignore msg) = putWord8 2 >> putString msg
-serialize (KexInit lists _kexPacketFollows) = do
+serialize (KexInit lists kexPacketFollows) = do
     putWord8 20
     putByteString $ S.pack [1..16]
     forM_ lists putList
+    putBool kexPacketFollows
     putWord32be 0 -- ?
+serialize (KexDhInit e) = do
+    putWord8 30 -- Who can find this constant value in less than 10 minutes?
+    putMpInt e
 serialize (Disconnect {..}) = do
     putWord8 1
     putWord32be disconnectReason

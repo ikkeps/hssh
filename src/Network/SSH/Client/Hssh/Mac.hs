@@ -1,6 +1,9 @@
 module Network.SSH.Client.Hssh.Mac where
 
 import Data.ByteString as S
+
+import Crypto.Hash.CryptoAPI (MD5)
+
 import Network.SSH.Client.Hssh.Prelude
 
 data Mac = Mac {

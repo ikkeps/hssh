@@ -6,6 +6,8 @@ import Data.Serialize.Get ( Get, getWord32be, getWord8, getByteString )
 import Data.Serialize.Put ( Put, putWord32be, putWord8, putByteString )
 import Control.Applicative ((<$>))
 
+import Crypto.Util (i2bs_unsized)
+
 getBool :: Get Bool
 getBool = (/= 0) <$> getWord8
 
@@ -20,6 +22,12 @@ putString :: S.ByteString -> Put
 putString str = do
     putWord32be $ fromIntegral $ S.length str
     putByteString str
+
+putMpInt :: Integer -> Put
+putMpInt 0 = putString ""
+putMpInt i | i > 0 = putString $ i2bs_unsized i
+           | i < 0 = error "Negative mpint not implemented!"
+
 
 parseList :: Get [S.ByteString]
 parseList = do

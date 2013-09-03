@@ -4,6 +4,7 @@ import qualified Data.ByteString as S
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Reader (ask, asks)
 import Control.Monad.State (get, gets, modify)
+import Control.Concurrent (threadDelay)
 import System.IO (stderr, hPutStrLn)
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -30,15 +31,14 @@ logic :: Conduit SshMessage Ssh SshMessage
 logic = go
   where
     go = do
-        mbInput <- await
-        case mbInput of
-          Just msg ->
-              do
-                debug " Got message:"
-                debug $ show msg
-                yield $ KexInit [["diffie-hellman-group1-sha1"], ["ssh-dss", "ssh-rsa"], ["aes256-cbc"], ["aes256-cbc"], ["hmac-sha1"], ["hmac-sha1"], ["none"], ["none"], [], []] False
-                go
-          Nothing -> return ()
+        awaitForever $ \msg -> do
+          debug " Got message:"
+          debug $ show msg
+          -- yield $ KexInit [["diffie-hellman-group1-sha1"], ["ssh-dss", "ssh-rsa"], ["aes256-cbc"], ["aes256-cbc"], ["hmac-sha1"], ["hmac-sha1"], ["none"], ["none"], [], []] False
+          yield msg
+          let kexdh = KexDhInit 66699991923192340192312341234123412341234123412341234
+          debug $ show kexdh
+          yield kexdh
 
 pipeline :: Conduit S.ByteString Ssh S.ByteString
 pipeline = parser =$= packetPipeline =$= serializer
@@ -51,6 +51,7 @@ pipeline = parser =$= packetPipeline =$= serializer
         debug $ "IN #" ++ (show seqNum)
         -- FIXME: using sinkGet here is bad, need to find better way
         lift packetParser >>= sinkGet >>= yield
+--        liftIO $ threadDelay 2000000
         bumpInSeqNumber
     serializer = do
         ask >>= yield . runPut . serializeHandshake
