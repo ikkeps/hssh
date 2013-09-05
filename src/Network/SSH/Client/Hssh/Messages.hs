@@ -15,14 +15,14 @@ data SshMessage =
   | Ignore S.ByteString
   | KexInit { kexInitAlgorithms                :: [S.ByteString]
             , kexInitServerHostKeyAlgorithms   :: [S.ByteString]
-            , kexInitEncriptionClientToServer  :: [S.ByteString]
-            , kexInitEncriptionServerToClient  :: [S.ByteString]
-            , kexInitMacClientToServer         :: [S.ByteString]
-            , kexInitMacServerToClient         :: [S.ByteString]
-            , kexInitCompressionClientToServer :: [S.ByteString]
-            , kexInitCompressionServerToClient :: [S.ByteString]
-            , kexInitLanguagesClientToServer   :: [S.ByteString]
-            , kexInitLanguagesServerToClient   :: [S.ByteString]
+            , kexInitEncriptionOut  :: [S.ByteString]
+            , kexInitEncriptionIn  :: [S.ByteString]
+            , kexInitMacOut         :: [S.ByteString]
+            , kexInitMacIn         :: [S.ByteString]
+            , kexInitCompressionOut :: [S.ByteString]
+            , kexInitCompressionIn :: [S.ByteString]
+            , kexInitLanguagesOut   :: [S.ByteString]
+            , kexInitLanguagesIn   :: [S.ByteString]
             , kexInitKexPacketFollows :: Bool }
   | KexDhInit { kexDhInitE :: Integer }
   deriving (Show)
@@ -38,14 +38,14 @@ serializeBody (KexInit {..}) = do
     putByteString $ S.pack [1..16] -- cookie
     mapM_ putList [ kexInitAlgorithms
                   , kexInitServerHostKeyAlgorithms
-                  , kexInitEncriptionClientToServer
-                  , kexInitEncriptionServerToClient
-                  , kexInitMacClientToServer
-                  , kexInitMacServerToClient
-                  , kexInitCompressionClientToServer
-                  , kexInitCompressionServerToClient
-                  , kexInitLanguagesClientToServer
-                  , kexInitLanguagesServerToClient ]
+                  , kexInitEncriptionOut
+                  , kexInitEncriptionIn
+                  , kexInitMacOut
+                  , kexInitMacIn
+                  , kexInitCompressionOut
+                  , kexInitCompressionIn
+                  , kexInitLanguagesOut
+                  , kexInitLanguagesIn ]
     putBool kexInitKexPacketFollows
     putWord32be 0 -- ?
 serializeBody (KexDhInit e) = putMpInt e
@@ -84,14 +84,14 @@ parseKexInit = do
     _cookie <- getByteString 16
     kexInitAlgorithms <- getList
     kexInitServerHostKeyAlgorithms <- getList
-    kexInitEncriptionClientToServer <- getList
-    kexInitEncriptionServerToClient <- getList
-    kexInitMacClientToServer <- getList
-    kexInitMacServerToClient <- getList
-    kexInitCompressionClientToServer <- getList
-    kexInitCompressionServerToClient <- getList
-    kexInitLanguagesClientToServer <- getList
-    kexInitLanguagesServerToClient <- getList
+    kexInitEncriptionOut <- getList
+    kexInitEncriptionIn <- getList
+    kexInitMacOut <- getList
+    kexInitMacIn <- getList
+    kexInitCompressionOut <- getList
+    kexInitCompressionIn <- getList
+    kexInitLanguagesOut <- getList
+    kexInitLanguagesIn <- getList
     kexInitKexPacketFollows <- getBool
     _reserved <- getWord32be
     return $ KexInit {..}

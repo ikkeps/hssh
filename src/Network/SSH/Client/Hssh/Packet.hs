@@ -43,7 +43,7 @@ sshTwoZeroDash = S.concat [sshDash, "2.0-"]
 
 packetParser :: Ssh (Get Packet)
 packetParser = do
-    mac <- gets sshstMacServerToClient
+    mac <- gets sshstMacIn
     return $ parser mac
   where
     parser mac = do
@@ -70,7 +70,7 @@ serializeHandshake SshSettings{sshsClientSoftware} = do
 
 packetSerializer :: Packet -> Ssh Put
 packetSerializer Packet { .. } = do
-    mac <- gets sshstMacClientToServer
+    mac <- gets sshstMacOut
     return $ do
       -- TODO: use cipher size to align in addition to default 8
       let paddingSize = 8 - (S.length packetPayload + 5) `rem` 8 + 8

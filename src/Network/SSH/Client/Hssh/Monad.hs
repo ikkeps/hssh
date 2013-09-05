@@ -1,4 +1,6 @@
-module Network.SSH.Client.Hssh.Monad (Ssh, SshSettings(..), SshState(..), runSsh, defaultSettings) where
+module Network.SSH.Client.Hssh.Monad (Ssh
+                                     , SshSettings(..), SshState(..)
+                                     , runSsh, defaultSettings) where
 
 import Data.Word (Word32)
 import qualified Data.ByteString as S
@@ -21,24 +23,24 @@ data SshSettings = SshSettings { sshsHost :: S.ByteString
                                , sshsClientSoftware :: S.ByteString
                                  -- Available algorithms in preference order
                                , sshsKexAlgorithms             :: [Kex.Kex]
-                               , sshsEncriptionClientToServer  :: [Cipher.Cipher]
-                               , sshsEncriptionServerToClient  :: [Cipher.Cipher]
-                               , sshsMacClientToServer         :: [Mac.Mac]
-                               , sshsMacServerToClient         :: [Mac.Mac]
---                               , sshsCompressionClientToServer :: [Compression]
---                               , sshsCompressionServerToClient :: [Compression]
+                               , sshsEncriptionOut  :: [Cipher.Cipher]
+                               , sshsEncriptionIn  :: [Cipher.Cipher]
+                               , sshsMacOut         :: [Mac.Mac]
+                               , sshsMacIn         :: [Mac.Mac]
+--                               , sshsCompressionOut :: [Compression]
+--                               , sshsCompressionIn :: [Compression]
                                  -- No support for languages list. Nobody cares.
                                }
 
 data SshState = SshState { sshstInputSeqNumber  :: Word32
                          , sshstOutputSeqNumber :: Word32
                          , sshstKexAlgorithm              :: Kex.Kex
-                         , sshstEncriptionClientToServer  :: Cipher.Cipher
-                         , sshstEncriptionServerToClient  :: Cipher.Cipher
-                         , sshstMacClientToServer         :: Mac.Mac
-                         , sshstMacServerToClient         :: Mac.Mac
---                         , sshsCompressionClientToServer :: Compression
---                         , sshsCompressionServerToClient :: Compression
+                         , sshstEncriptionOut  :: Cipher.Cipher
+                         , sshstEncriptionIn  :: Cipher.Cipher
+                         , sshstMacOut         :: Mac.Mac
+                         , sshstMacIn         :: Mac.Mac
+--                         , sshsCompressionOut :: Compression
+--                         , sshsCompressionIn :: Compression
 
                          }
 
@@ -60,10 +62,10 @@ initialState :: SshState
 initialState = SshState { sshstInputSeqNumber = 0
                         , sshstOutputSeqNumber = 0
                         , sshstKexAlgorithm = Kex.ecdh_sha2_nistp256
-                        , sshstMacClientToServer = Mac.none
-                        , sshstMacServerToClient = Mac.none
-                        , sshstEncriptionClientToServer = Cipher.none
-                        , sshstEncriptionServerToClient = Cipher.none }
+                        , sshstMacOut = Mac.none
+                        , sshstMacIn = Mac.none
+                        , sshstEncriptionOut = Cipher.none
+                        , sshstEncriptionIn = Cipher.none }
 
 
 defaultSettings :: S.ByteString -> SshSettings
@@ -72,7 +74,7 @@ defaultSettings host =
                 , sshsHost = host
                 , sshsPort = 22
                 , sshsKexAlgorithms = [Kex.ecdh_sha2_nistp256]
-                , sshsEncriptionClientToServer = [Cipher.aes128_ctr]
-                , sshsEncriptionServerToClient = [Cipher.aes128_ctr]
-                , sshsMacClientToServer = [Mac.hmac_md5, Mac.none]
-                , sshsMacServerToClient = [Mac.hmac_md5, Mac.none] }
+                , sshsEncriptionOut = [Cipher.aes128_ctr]
+                , sshsEncriptionIn = [Cipher.aes128_ctr]
+                , sshsMacOut = [Mac.hmac_md5, Mac.none]
+                , sshsMacIn = [Mac.hmac_md5, Mac.none] }

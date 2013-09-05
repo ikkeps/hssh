@@ -41,27 +41,27 @@ logic = go
 
     negotiateAll KexInit {..} = do
       SshSettings {..} <- ask
-      macOut <- lift $ negotiateMac kexInitMacClientToServer sshsMacClientToServer
-      modify $ \s -> s{sshstMacClientToServer = macOut}
+      macOut <- lift $ negotiateMac kexInitMacOut sshsMacOut
+      modify $ \s -> s{sshstMacOut = macOut}
 
-      macIn <- lift $ negotiateMac kexInitMacServerToClient sshsMacServerToClient
-      modify $ \s -> s{sshstMacServerToClient = macIn}
+      macIn <- lift $ negotiateMac kexInitMacIn sshsMacIn
+      modify $ \s -> s{sshstMacIn = macIn}
 
-      cipherOut <- lift $ negotiateCipher kexInitEncriptionClientToServer sshsEncriptionClientToServer
-      modify $ \s -> s{sshstEncriptionClientToServer = cipherOut}
+      cipherOut <- lift $ negotiateCipher kexInitEncriptionOut sshsEncriptionOut
+      modify $ \s -> s{sshstEncriptionOut = cipherOut}
 
-      cipherIn <- lift $ negotiateCipher kexInitEncriptionServerToClient sshsEncriptionServerToClient
-      modify $ \s -> s{sshstEncriptionServerToClient = cipherIn}
+      cipherIn <- lift $ negotiateCipher kexInitEncriptionIn sshsEncriptionIn
+      modify $ \s -> s{sshstEncriptionIn = cipherIn}
     negotiateAll msg = error $ "Unexpected message: " <> show msg
     keyExchange = yield $ KexDhInit 666
 
     showNegotiated = do
       SshState {..} <- get
       debug $ "Negotiated " <> (show $ kexName sshstKexAlgorithm)
-                     <> " " <> (show $ cipherName sshstEncriptionClientToServer)
-                     <> "/" <> (show $ cipherName sshstEncriptionServerToClient)
-                     <> " " <> (show $ macName sshstMacClientToServer)
-                     <> "/" <> (show $ macName sshstMacServerToClient)
+                     <> " " <> (show $ cipherName sshstEncriptionOut)
+                     <> "/" <> (show $ cipherName sshstEncriptionIn)
+                     <> " " <> (show $ macName sshstMacOut)
+                     <> "/" <> (show $ macName sshstMacIn)
       debug $ ""
 
 
@@ -84,14 +84,14 @@ mkKexInit packetFollows = do
     return $ KexInit {
           kexInitAlgorithms = ["diffie-hellman-group-exchange-sha256"] -- map kexName sshsKexAlgorithms
         , kexInitServerHostKeyAlgorithms = ["ssh-rsa","ssh-dss","ecdsa-sha2-nistp256"]
-        , kexInitEncriptionServerToClient = map cipherName sshsEncriptionServerToClient
-        , kexInitEncriptionClientToServer = map cipherName sshsEncriptionClientToServer
-        , kexInitMacClientToServer = map macName sshsMacClientToServer
-        , kexInitMacServerToClient = map macName sshsMacServerToClient
-        , kexInitCompressionClientToServer = ["none"]
-        , kexInitCompressionServerToClient = ["none"]
-        , kexInitLanguagesClientToServer = []
-        , kexInitLanguagesServerToClient = []
+        , kexInitEncriptionIn = map cipherName sshsEncriptionIn
+        , kexInitEncriptionOut = map cipherName sshsEncriptionOut
+        , kexInitMacOut = map macName sshsMacOut
+        , kexInitMacIn = map macName sshsMacIn
+        , kexInitCompressionOut = ["none"]
+        , kexInitCompressionIn = ["none"]
+        , kexInitLanguagesOut = []
+        , kexInitLanguagesIn = []
         , kexInitKexPacketFollows = packetFollows
         }
 
