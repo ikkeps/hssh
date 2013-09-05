@@ -12,5 +12,5 @@ data Mac = Mac {
     , calcMac :: S.ByteString -> S.ByteString
     }
 
-
+mkMacNone :: Mac
 mkMacNone = Mac { macName = "none", macLength = 0, calcMac = const "" }

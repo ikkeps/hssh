@@ -28,35 +28,42 @@ data SshMessage =
   deriving (Show)
 
 serialize :: SshMessage -> Put
-serialize (Ignore msg) = putWord8 2 >> putString msg
-serialize (KexInit {..}) = do
-    putWord8 20
+serialize msg = do
+    putWord8 $ code msg
+    serializeBody msg
+
+serializeBody :: SshMessage -> Put
+serializeBody (Ignore msg) = putString msg
+serializeBody (KexInit {..}) = do
     putByteString $ S.pack [1..16] -- cookie
-    mapM putList [ kexInitAlgorithms
-                 , kexInitServerHostKeyAlgorithms
-                 , kexInitEncriptionClientToServer
-                 , kexInitEncriptionServerToClient
-                 , kexInitMacClientToServer
-                 , kexInitMacServerToClient
-                 , kexInitCompressionClientToServer
-                 , kexInitCompressionServerToClient
-                 , kexInitLanguagesClientToServer
-                 , kexInitLanguagesServerToClient ]
+    mapM_ putList [ kexInitAlgorithms
+                  , kexInitServerHostKeyAlgorithms
+                  , kexInitEncriptionClientToServer
+                  , kexInitEncriptionServerToClient
+                  , kexInitMacClientToServer
+                  , kexInitMacServerToClient
+                  , kexInitCompressionClientToServer
+                  , kexInitCompressionServerToClient
+                  , kexInitLanguagesClientToServer
+                  , kexInitLanguagesServerToClient ]
     putBool kexInitKexPacketFollows
     putWord32be 0 -- ?
-serialize (KexDhInit e) = do
-    putWord8 30 -- Who can find this constant value in less than 10 minutes?
-    putMpInt e
-serialize (Disconnect {..}) = do
-    putWord8 1
+serialize' (KexDhInit e) = putMpInt e
+serialize' (Disconnect {..}) = do
     putWord32be disconnectReason
     putString disconnectDescription
     putString disconnectLangTag
 
+code :: SshMessage -> Word8
+code (Disconnect {..}) = 1
+code (Ignore _) = 2
+code (KexInit {..}) = 20
+code (KexDhInit _) = 30
+
 parse :: Get SshMessage
 parse = do
-    code <- getWord8
-    case code of
+    msgCode <- getWord8
+    case msgCode of
        1 -> parseDisconnect
        2 -> parseIgnore
        20 -> parseKexInit
@@ -75,17 +82,16 @@ parseIgnore = getString >>= return . Ignore
 parseKexInit :: Get SshMessage
 parseKexInit = do
     _cookie <- getByteString 16
-    msg <- KexInit
-            <$> getList
-            <*> getList
-            <*> getList
-            <*> getList
-            <*> getList
-            <*> getList
-            <*> getList
-            <*> getList
-            <*> getList
-            <*> getList
-            <*> getBool
+    kexInitAlgorithms <- getList
+    kexInitServerHostKeyAlgorithms <- getList
+    kexInitEncriptionClientToServer <- getList
+    kexInitEncriptionServerToClient <- getList
+    kexInitMacClientToServer <- getList
+    kexInitMacServerToClient <- getList
+    kexInitCompressionClientToServer <- getList
+    kexInitCompressionServerToClient <- getList
+    kexInitLanguagesClientToServer <- getList
+    kexInitLanguagesServerToClient <- getList
+    kexInitKexPacketFollows <- getBool
     _reserved <- getWord32be
-    return msg
+    return $ KexInit {..}
