@@ -45,7 +45,7 @@ data SshState = SshState { sshstInputSeqNumber  :: Word32
 --                         , sshsCompressionIn :: Compression
                          }
 
--- TODO: add error handler in monad stack?
+-- TODO: add error transformer somewhere in monad stack?
 newtype Ssh a = Ssh { unSsh :: ReaderT SshSettings (StateT SshState IO) a }
               deriving (MonadReader SshSettings, Monad, MonadState SshState, MonadIO, Applicative, MonadThrow, Functor)
 
