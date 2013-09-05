@@ -22,11 +22,12 @@ data SshSettings = SshSettings { sshsHost :: S.ByteString
                                , sshsPort :: Int
                                , sshsClientSoftware :: S.ByteString
                                  -- Available algorithms in preference order
-                               , sshsKexAlgorithms             :: [Kex.Kex]
-                               , sshsEncriptionOut  :: [Cipher.Cipher]
+                               , sshsKexAlgorithms :: [Kex.Kex]
+                               , sshsEncriptionOut :: [Cipher.Cipher]
                                , sshsEncriptionIn  :: [Cipher.Cipher]
-                               , sshsMacOut         :: [Mac.Mac]
+                               , sshsMacOut        :: [Mac.Mac]
                                , sshsMacIn         :: [Mac.Mac]
+                                 -- FIXME: add compression?
 --                               , sshsCompressionOut :: [Compression]
 --                               , sshsCompressionIn :: [Compression]
                                  -- No support for languages list. Nobody cares.
@@ -34,16 +35,17 @@ data SshSettings = SshSettings { sshsHost :: S.ByteString
 
 data SshState = SshState { sshstInputSeqNumber  :: Word32
                          , sshstOutputSeqNumber :: Word32
-                         , sshstKexAlgorithm              :: Kex.Kex
-                         , sshstEncriptionOut  :: Cipher.Cipher
+                         , sshstKexAlgorithm  :: Kex.Kex
+                         , sshstEncriptionOut :: Cipher.Cipher
                          , sshstEncriptionIn  :: Cipher.Cipher
-                         , sshstMacOut         :: Mac.Mac
+                         , sshstMacOut        :: Mac.Mac
                          , sshstMacIn         :: Mac.Mac
+                           -- FIXME: add compression?
 --                         , sshsCompressionOut :: Compression
 --                         , sshsCompressionIn :: Compression
-
                          }
 
+-- TODO: add error handler in monad stack?
 newtype Ssh a = Ssh { unSsh :: ReaderT SshSettings (StateT SshState IO) a }
               deriving (MonadReader SshSettings, Monad, MonadState SshState, MonadIO, Applicative, MonadThrow, Functor)
 

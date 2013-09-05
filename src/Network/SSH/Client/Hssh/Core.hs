@@ -40,6 +40,7 @@ logic = go
           keyExchange
 
     negotiateAll KexInit {..} = do
+      -- FIXME: implement negotiation properly (cipher, kex, compression)
       SshSettings {..} <- ask
       macOut <- lift $ negotiateMac kexInitMacOut sshsMacOut
       modify $ \s -> s{sshstMacOut = macOut}
@@ -77,11 +78,11 @@ negotiate name server's client's = do
       Just a -> return a
       Nothing -> error "Negotiation error"
 
-
 mkKexInit :: Bool -> Ssh SshMessage
 mkKexInit packetFollows = do
     SshSettings {..} <- ask
     return $ KexInit {
+         -- FIXME: remove hardcode
           kexInitAlgorithms = ["diffie-hellman-group-exchange-sha256"] -- map kexName sshsKexAlgorithms
         , kexInitServerHostKeyAlgorithms = ["ssh-rsa","ssh-dss","ecdsa-sha2-nistp256"]
         , kexInitEncriptionIn = map cipherName sshsEncriptionIn
@@ -103,7 +104,6 @@ pipeline = parser =$= packetPipeline =$= serializer
       forever $ do
         -- FIXME: using sinkGet here is bad, maybe, need to find better way
         lift packetParser >>= sinkGet >>= yield
---        liftIO $ threadDelay 2000000
         bumpInSeqNumber
     serializer = do
         ask >>= yield . runPut . serializeHandshake
