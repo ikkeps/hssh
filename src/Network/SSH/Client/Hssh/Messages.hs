@@ -48,8 +48,8 @@ serializeBody (KexInit {..}) = do
                   , kexInitLanguagesServerToClient ]
     putBool kexInitKexPacketFollows
     putWord32be 0 -- ?
-serialize' (KexDhInit e) = putMpInt e
-serialize' (Disconnect {..}) = do
+serializeBody (KexDhInit e) = putMpInt e
+serializeBody (Disconnect {..}) = do
     putWord32be disconnectReason
     putString disconnectDescription
     putString disconnectLangTag

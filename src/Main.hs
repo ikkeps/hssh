@@ -9,4 +9,4 @@ main = do
     hSetBuffering stdout LineBuffering
     hSetBuffering stdin LineBuffering
     hSetBuffering stderr LineBuffering
-    runClient $ (defaultSettings "localhost") {sshsPort = 12345 }
+    runClient $ (defaultSettings "localhost") {sshsPort = 22 }
