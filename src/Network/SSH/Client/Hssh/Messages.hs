@@ -13,18 +13,36 @@ data SshMessage =
                , disconnectDescription :: S.ByteString
                , disconnectLangTag :: S.ByteString }
   | Ignore S.ByteString
-  | KexInit { kexInitLists            :: [[S.ByteString]]
+  | KexInit { kexInitAlgorithms                :: [S.ByteString]
+            , kexInitServerHostKeyAlgorithms   :: [S.ByteString]
+            , kexInitEncriptionClientToServer  :: [S.ByteString]
+            , kexInitEncriptionServerToClient  :: [S.ByteString]
+            , kexInitMacClientToServer         :: [S.ByteString]
+            , kexInitMacServerToClient         :: [S.ByteString]
+            , kexInitCompressionClientToServer :: [S.ByteString]
+            , kexInitCompressionServerToClient :: [S.ByteString]
+            , kexInitLanguagesClientToServer   :: [S.ByteString]
+            , kexInitLanguagesServerToClient   :: [S.ByteString]
             , kexInitKexPacketFollows :: Bool }
   | KexDhInit { kexDhInitE :: Integer }
   deriving (Show)
 
 serialize :: SshMessage -> Put
 serialize (Ignore msg) = putWord8 2 >> putString msg
-serialize (KexInit lists kexPacketFollows) = do
+serialize (KexInit {..}) = do
     putWord8 20
-    putByteString $ S.pack [1..16]
-    forM_ lists putList
-    putBool kexPacketFollows
+    putByteString $ S.pack [1..16] -- cookie
+    mapM putList [ kexInitAlgorithms
+                 , kexInitServerHostKeyAlgorithms
+                 , kexInitEncriptionClientToServer
+                 , kexInitEncriptionServerToClient
+                 , kexInitMacClientToServer
+                 , kexInitMacServerToClient
+                 , kexInitCompressionClientToServer
+                 , kexInitCompressionServerToClient
+                 , kexInitLanguagesClientToServer
+                 , kexInitLanguagesServerToClient ]
+    putBool kexInitKexPacketFollows
     putWord32be 0 -- ?
 serialize (KexDhInit e) = do
     putWord8 30 -- Who can find this constant value in less than 10 minutes?
@@ -56,8 +74,18 @@ parseIgnore = getString >>= return . Ignore
 
 parseKexInit :: Get SshMessage
 parseKexInit = do
-    _ <- getByteString 16
-    lists <- replicateM 10 parseList
-    kexPacketFollows <- getBool
-    -- getWord32be
-    return $ KexInit lists kexPacketFollows
+    _cookie <- getByteString 16
+    msg <- KexInit
+            <$> getList
+            <*> getList
+            <*> getList
+            <*> getList
+            <*> getList
+            <*> getList
+            <*> getList
+            <*> getList
+            <*> getList
+            <*> getList
+            <*> getBool
+    _reserved <- getWord32be
+    return msg

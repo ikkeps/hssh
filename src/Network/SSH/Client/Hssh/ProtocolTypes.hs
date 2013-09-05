@@ -29,8 +29,8 @@ putMpInt i | i > 0 = putString $ i2bs_unsized i
            | i < 0 = error "Negative mpint not implemented!"
 
 
-parseList :: Get [S.ByteString]
-parseList = do
+getList :: Get [S.ByteString]
+getList = do
     string <- getString
     return $ S.split (fromIntegral $ ord ',') string
 
