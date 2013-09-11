@@ -123,8 +123,8 @@ pipeline = parser =$= packetPipeline =$= serializer
 packetPipeline :: Conduit Packet Ssh Packet
 packetPipeline = extractMessage =$= logic =$= wrapMessage
   where
-    extractMessage = CL.map packetPayload =$= conduitGet parse
-    wrapMessage = conduitPut serialize =$= CL.map Packet
+    extractMessage = CL.map packetPayload =$= conduitGet getMessage
+    wrapMessage = conduitPut putMessage =$= CL.map Packet
 
 debug :: (MonadIO m) => String -> m ()
 debug = liftIO . (hPutStrLn stderr)

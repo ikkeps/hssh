@@ -1,4 +1,4 @@
-module Network.SSH.Client.Hssh.Messages where
+module Network.SSH.Client.Hssh.Messages (SshMessage(..), getMessage, putMessage) where
 
 import Data.ByteString as S
 import Data.Serialize.Get ( Get, getWord32be, getWord8, getByteString )
@@ -24,17 +24,18 @@ data SshMessage =
             , kexInitLanguagesOut   :: [S.ByteString]
             , kexInitLanguagesIn   :: [S.ByteString]
             , kexInitKexPacketFollows :: Bool }
-  | KexDhInit { kexDhInitE :: Integer }
+  | KexDhInit { kexDhInitE :: Integer } -- FIXME: it's just a placeholder
+  | Unsupported { unsupportedCode :: Word8 } -- FIXME: Add payload
   deriving (Show)
 
-serialize :: SshMessage -> Put
-serialize msg = do
-    putWord8 $ code msg
-    serializeBody msg
+putMessage :: SshMessage -> Put
+putMessage msg = do
+    putWord8 $ codeOf msg
+    putBody msg
 
-serializeBody :: SshMessage -> Put
-serializeBody (Ignore msg) = putString msg
-serializeBody (KexInit {..}) = do
+putBody :: SshMessage -> Put
+putBody (Ignore msg) = putString msg
+putBody (KexInit {..}) = do
     putByteString $ S.pack [1..16] -- cookie
     mapM_ putList [ kexInitAlgorithms
                   , kexInitServerHostKeyAlgorithms
@@ -48,39 +49,44 @@ serializeBody (KexInit {..}) = do
                   , kexInitLanguagesIn ]
     putBool kexInitKexPacketFollows
     putWord32be 0 -- ?
-serializeBody (KexDhInit e) = putMpInt e
-serializeBody (Disconnect {..}) = do
+putBody (KexDhInit e) = putMpInt e
+putBody Disconnect {..} = do
     putWord32be disconnectReason
     putString disconnectDescription
     putString disconnectLangTag
+putBody Unsupported {..} = error "Trying to serialize unsupported message"
 
-code :: SshMessage -> Word8
-code (Disconnect {..}) = 1
-code (Ignore _) = 2
-code (KexInit {..}) = 20
-code (KexDhInit _) = 30
+codeOf :: SshMessage -> Word8
+codeOf (Disconnect {..}) = 1
+codeOf (Ignore _) = 2
+codeOf (KexInit {..}) = 20
+codeOf (KexDhInit _) = 30
+codeOf (Unsupported {..}) = error "Can not serialize code of unsupported message"
 
-parse :: Get SshMessage
-parse = do
+getMessage :: Get SshMessage
+getMessage = do
     msgCode <- getWord8
     case msgCode of
-       1 -> parseDisconnect
-       2 -> parseIgnore
-       20 -> parseKexInit
-       _  -> parseIgnore
+       1 -> getDisconnect
+       2 -> getIgnore
+       20 -> getKexInit
+       _  -> getUnsupported msgCode
 
-parseDisconnect :: Get SshMessage
-parseDisconnect = do
+getUnsupported :: Word8 -> Get SshMessage
+getUnsupported msgCode = return $ Unsupported msgCode
+
+getDisconnect :: Get SshMessage
+getDisconnect = do
     reason <- getWord32be
     description <- getString
     langCode <- getString
     return $ Disconnect reason description langCode
 
-parseIgnore :: Get SshMessage
-parseIgnore = getString >>= return . Ignore
+getIgnore :: Get SshMessage
+getIgnore = Ignore <$> getString
 
-parseKexInit :: Get SshMessage
-parseKexInit = do
+getKexInit :: Get SshMessage
+getKexInit = do
     _cookie <- getByteString 16
     kexInitAlgorithms <- getList
     kexInitServerHostKeyAlgorithms <- getList
