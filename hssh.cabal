@@ -20,6 +20,7 @@ Executable test
                   , MultiParamTypeClasses
                   , TypeFamilies
                   , NamedFieldPuns
+                  , ExistentialQuantification
   build-depends:    base                      == 4.6.*
                   , mtl                       == 2.1.*  
                   , bytestring                == 0.10.*

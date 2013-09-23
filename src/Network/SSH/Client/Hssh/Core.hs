@@ -9,7 +9,7 @@ import qualified Data.Conduit.List as CL
 import Data.Conduit.Cereal (conduitGet, sinkGet, conduitPut)
 import Data.Serialize.Put (runPut)
 
-import Data.Conduit.Network ( clientSettings, runTCPClient, appSource, appSink )
+import Data.Conduit.Network (clientSettings, runTCPClient, appSource, appSink)
 
 import Network.SSH.Client.Hssh.Prelude
 import Network.SSH.Client.Hssh.Monad (Ssh, SshSettings(..), SshState(..),
@@ -18,7 +18,8 @@ import Network.SSH.Client.Hssh.Cipher (Cipher(..))
 import Network.SSH.Client.Hssh.Mac (Mac(..))
 import Network.SSH.Client.Hssh.Kex (Kex(..))
 import Network.SSH.Client.Hssh.Messages
-import Network.SSH.Client.Hssh.Packet
+import Network.SSH.Client.Hssh.Packet (Packet(..), getPacket, putPacket,
+                                       getHandshake, putHandshake)
 
 
 runClient :: SshSettings -> IO ()
@@ -27,6 +28,7 @@ runClient s@SshSettings{..} = runSsh s $ do
   where
     app d = (appSource d) $= pipeline $$ (appSink d)
 
+
 logic :: Conduit SshMessage Ssh SshMessage
 logic = go
   where
@@ -34,13 +36,12 @@ logic = go
         debug $ "Sending KEX_INIT..."
         lift (mkKexInit False) >>= yield
         debug $ "Awaiting for KEX_INIT..."
-        awaitForever $ \kexInit -> do
+        awaitForever $ \(SshMessage kexInit) -> do
           negotiateAll kexInit
-          showNegotiated
+          showAlgorithms
           keyExchange
 
     negotiateAll KexInit {..} = do
-      -- FIXME: implement negotiation properly (cipher, kex, compression)
       SshSettings {..} <- ask
       macOut <- lift $ negotiateMac kexInitMacOut sshsMacOut
       modify $ \s -> s{sshstMacOut = macOut}
@@ -48,15 +49,21 @@ logic = go
       macIn <- lift $ negotiateMac kexInitMacIn sshsMacIn
       modify $ \s -> s{sshstMacIn = macIn}
 
+      -- FIXME: implement cipher negotiation properly
       cipherOut <- lift $ negotiateCipher kexInitEncriptionOut sshsEncriptionOut
       modify $ \s -> s{sshstEncriptionOut = cipherOut}
 
       cipherIn <- lift $ negotiateCipher kexInitEncriptionIn sshsEncriptionIn
       modify $ \s -> s{sshstEncriptionIn = cipherIn}
-    negotiateAll msg = error $ "Unexpected message: " <> show msg
-    keyExchange = yield $ KexDhInit 666
 
-    showNegotiated = do
+      -- FIXME: implement kex and host key algorithm negotiation
+
+    negotiateAll msg = error $ "Unexpected message: " <> show msg
+    keyExchange =
+      -- FIXME: implement key exchange
+      yield $ SshMessage $ KexDhInit 666
+
+    showAlgorithms = do
       SshState {..} <- get
       debug $ "Negotiated " <> (show $ kexName sshstKexAlgorithm)
                      <> " " <> (show $ cipherName sshstEncriptionOut)
@@ -64,7 +71,6 @@ logic = go
                      <> " " <> (show $ macName sshstMacOut)
                      <> "/" <> (show $ macName sshstMacIn)
       debug $ ""
-
 
 negotiateMac :: [S.ByteString] -> [Mac] -> Ssh Mac
 negotiateMac = negotiate macName
@@ -81,7 +87,7 @@ negotiate name server's client's = do
 mkKexInit :: Bool -> Ssh SshMessage
 mkKexInit packetFollows = do
     SshSettings {..} <- ask
-    return $ KexInit {
+    return $ SshMessage $ KexInit {
          -- FIXME: remove hardcode
           kexInitAlgorithms = ["diffie-hellman-group-exchange-sha256"] -- map kexName sshsKexAlgorithms
         , kexInitServerHostKeyAlgorithms = ["ssh-rsa","ssh-dss","ecdsa-sha2-nistp256"]
@@ -100,16 +106,17 @@ pipeline :: Conduit S.ByteString Ssh S.ByteString
 pipeline = parser =$= packetPipeline =$= serializer
   where
     parser = do
-      _ <- sinkGet parseHandshake
+      -- FIXME: using sinkGet here is bad, maybe, need to find better way
+      _ <- sinkGet getHandshake
       forever $ do
         -- FIXME: using sinkGet here is bad, maybe, need to find better way
-        lift packetParser >>= sinkGet >>= yield
+        lift getPacket >>= sinkGet >>= yield
         bumpInSeqNumber
     serializer = do
-        ask >>= yield . runPut . serializeHandshake
+        lift putHandshake >>= yield . runPut
         CL.mapM $ \packet -> do
             -- FIXME: Using bare runPut seems unefficient to me
-            bin <- runPut <$> packetSerializer packet
+            bin <- runPut <$> putPacket packet
             bumpOutSeqNumber
             return bin
     -- Lens, anyone?

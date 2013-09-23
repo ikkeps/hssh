@@ -1,4 +1,6 @@
-module Network.SSH.Client.Hssh.Packet where
+module Network.SSH.Client.Hssh.Packet ( getPacket, putPacket
+                                      , getHandshake, putHandshake
+                                      , Packet(..)) where
 import Data.Serialize.Get (Get, getWord32be, getWord8, getByteString, label)
 import Data.Serialize.Put (Put, runPut, putByteString, putWord32be, putWord8)
 
@@ -22,8 +24,8 @@ crlfLine = go S.empty
               return string
             _  -> go (S.snoc string ch)
 
-parseHandshake :: Get S.ByteString
-parseHandshake = do
+getHandshake :: Get S.ByteString
+getHandshake = do
     line <- crlfLine
     case sshDash `S.isPrefixOf` line of
       True -> parseVersionAndSoftware line
@@ -41,8 +43,8 @@ sshDash = "SSH-"
 sshTwoZeroDash :: S.ByteString
 sshTwoZeroDash = S.concat [sshDash, "2.0-"]
 
-packetParser :: Ssh (Get Packet)
-packetParser = do
+getPacket :: Ssh (Get Packet)
+getPacket = do
     mac <- gets sshstMacIn
     return $ parser mac
   where
@@ -64,12 +66,13 @@ packetParser = do
 crlf :: S.ByteString
 crlf = S.pack [13, 10]
 
-serializeHandshake :: SshSettings -> Put
-serializeHandshake SshSettings{sshsClientSoftware} = do
-    putByteString (S.concat [sshTwoZeroDash, sshsClientSoftware, crlf])
+putHandshake :: Ssh Put
+putHandshake = do
+    software <- asks sshsClientSoftware
+    return $ putByteString (S.concat [sshTwoZeroDash, software, crlf])
 
-packetSerializer :: Packet -> Ssh Put
-packetSerializer Packet { .. } = do
+putPacket :: Packet -> Ssh Put
+putPacket Packet { .. } = do
     mac <- gets sshstMacOut
     return $ do
       -- TODO: use cipher size to align in addition to default 8
