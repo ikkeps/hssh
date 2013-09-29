@@ -24,7 +24,7 @@ data SshMessage =
             , kexInitLanguagesOut   :: [S.ByteString]
             , kexInitLanguagesIn   :: [S.ByteString]
             , kexInitKexPacketFollows :: Bool }
-  | KexDhInit { kexDhInitE :: Integer } -- FIXME: it's just a placeholder
+  | KexDhInit 
   | Unsupported { unsupportedCode :: Word8 } -- FIXME: Add payload
   deriving (Show)
 
